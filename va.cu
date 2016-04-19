@@ -1,10 +1,11 @@
+// Header files 
 #include <cuda_runtime.h>
-
 #include <cstddef>
 #include <sys/time.h>
 #include <iostream>
 #include <vector>
 
+// Routine to check error 
 void checkError (cudaError_t err)
 {
     if(err != cudaSuccess )
@@ -13,7 +14,7 @@ void checkError (cudaError_t err)
         exit(-1);
     }
 }
-
+// time function 
 double getSeconds()
 {
     struct timeval tp ;
@@ -21,6 +22,7 @@ double getSeconds()
     return ((double)tp.tv_sec + (double)tp.tv_usec * 1e-6) ;
 }
 
+// sum function 
 __global__ void sum(int *A , int *B, int *C, long long N)
 {
     long long idx = blockIdx.x * blockDim.x + threadIdx.x ;
@@ -30,6 +32,7 @@ __global__ void sum(int *A , int *B, int *C, long long N)
     }
 }
 
+// main 
 int main() {
 
     const long long nElem = 1<<20 ;
