@@ -1,4 +1,3 @@
-
 //
 //  main.cpp
 //  High End simulation in Practice
@@ -99,54 +98,66 @@ public:
     }
 };
 
-    // Device Function //
+// Device Function //
+
+__global__ void juliaImage(unsigned int * color_bit_device, long long N, const long double mesh) {
     
-    __global__ void juliaImage(unsigned int * color_bit_device, long long N, const long double mesh) {
-         
-	long long idx = blockIdx.x * blockDim.x + threadIdx.x ;
-	const double x = (mesh * (idx % N)) - 2.0 ; 
-	const double y = (mesh * (idx / N)) - 2.0 ; 
-	const int numIter = 200 ; 
-	const Complex c(0,-0.8) ;
-	Complex z(x,y) ; 
-	const int threshold = 10
-	
-	for(size_t i =0 ; i < numIter; ++i){
-	  z = z.square() + c ; 
-	}
-	
-	color_bit_device[idx] = z.modulus() ;
+    long long idx = blockIdx.x * blockDim.x + threadIdx.x ;
+    const double x = (mesh * (idx % N)) - 2.0 ;
+    const double y = (mesh * (idx / N)) - 2.0 ;
+    const int numIter = 200 ;
+    const Complex c(0,-0.8) ;
+    Complex z(x,y) ;
+    const int threshold = 10 ;
+    
+    for(size_t i =0 ; i < numIter; ++i){
+        z = z.square();
+        z = z + c ;
     }
     
-    int main() {
-        
-        
-        const long long numberOfGridPoints_ = (1<<11 )* (1<<11) ;
-        const long long bytes_ = numberOfGridPoints_ * sizeof(unsigned int) ;
-        long double mesh = 1.0 / (N-1) ;
-        std::cout<<"The Total Memory in MB allocated for the program is :="<<bytes_ * 1e-6<<std::endl ;
-        
-        // Allocating Vector on Host
-        std::vector<unsigned int> color_bit(numberOfGridPoints_,0) ;
-        
-        // Pointer on device
-        unsigned int * color_bit_device  ;
-        
-        // Allocating memory on device 
-        checkError(cudaMalloc(&color_bit_device,bytes_)) ; 
-        
-        // Copying Data from host to device 
-        checkError(cudaMemcpy(color_bit_device,&color_bit[0],bytes_,cudaMemcpyHostToDevice)) ;
-        
-        double start = getSeconds() ; 
-	juliaImage<<<(1<<12),(1<<10)>>>(color_bit_device,numberOfGridPoints_,mesh) ; 
-	double end = getSeconds() ; 
-	
-	// Copying data back to Host
-	checkError(cudaMemcpy(color_bit[0],&color_bit_device,cudaMemcpyDeviceToHost)) ; 
-	
-	// Freeing the memory on the device 
-	checkError(cudaFree(color_bit_device)) ; 
-	
-        return 0 ;
+    color_bit_device[idx] = z.modulus() ;
+}
+
+int main() {
+    
+    
+    const long long numberOfGridPoints_ = (1<<11)* (1<<11 ) ;
+    const long long bytes_ = numberOfGridPoints_ * sizeof(unsigned int) ;
+    long double mesh = 1.0 / ((1<<11 ) -1) ;
+    std::cout<<"The Total Memory in MB allocated for the program is :="<<bytes_ * 1e-6<<std::endl ;
+    
+    // Allocating Vector on Host
+    std::vector<unsigned int> color_bit(numberOfGridPoints_,0) ;
+    
+    // Pointer on device
+    unsigned int * color_bit_device  ;
+    
+    // Allocating memory on device
+    checkError(cudaMalloc(&color_bit_device,bytes_)) ;
+    
+    // Copying Data from host to device
+    checkError(cudaMemcpy(color_bit_device,&color_bit[0],bytes_,cudaMemcpyHostToDevice)) ;
+    
+    double start = getSeconds() ;
+    juliaImage<<<(1<<12),(1<<10)>>>(color_bit_device,numberOfGridPoints_,mesh) ;
+    double end = getSeconds() ;
+    
+    // Copying data back to Host
+    checkError(cudaMemcpy(color_bit[0],&color_bit_device,cudaMemcpyDeviceToHost)) ;
+    
+    // Freeing the memory on the device
+    checkError(cudaFree(color_bit_device)) ;
+
+    
+    //Appyling the color bit mapping
+    for (auto i =0; i <color_bit.size(); ++i) {
+        if (color_bit[i]< 10) {
+            color_bit[i] = // black l
+        }
+        else
+            color_bit[i] = // red
     }
+    
+    
+    return 0 ;
+}
