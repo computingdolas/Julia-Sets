@@ -37,34 +37,34 @@ class Complex {
     
 public:
     
-    Complex(const double _real, const double _imag): real(_real), imag(_imag){}
-    Complex(){
+    __host__ __device__ Complex(const double _real, const double _imag): real(_real), imag(_imag){}
+    __host__ __device__ Complex(){
         this->real = 0.0 ;
         this->imag = 0.0 ;
     }
-    ~Complex(){} ;
+    __host__ __device__ ~Complex(){} ;
     
     // Access for the real part
     
-    const double& realpart() const {
+    __host__ __device__ const double& realpart() const {
         return this->real ;
     }
     
-    double & realpart() {
+    __host__ __device__ double & realpart() {
         return this->real ;
     }
     
     // Access for the imag part
     
-    const double & imagpart() const {
+    __host__ __device__ const double & imagpart() const {
         return this->imag ;
     }
     
-    double & imagpart() {
+    __host__ __device__ double & imagpart() {
         return this->imag ;
     }
     
-    const Complex square() {
+    __host__ __device__ const Complex square() {
         Complex temp ;
         
         temp.realpart() = (this->realpart() * this->realpart()) - (this->imagpart() * this->imagpart()) ;
@@ -77,11 +77,11 @@ public:
         
     }
     
-    const double modulus() const{
+    __host__ __device__ const double modulus() const{
         return std::sqrt((this->real * this->real) + (this->imag * this->imag)) ;
     }
     
-    Complex operator+ (const Complex & obj){
+    __host__ __device__ Complex operator+ (const Complex & obj){
         Complex temp ;
         
         double real = this->real + obj.realpart() ;
@@ -90,7 +90,7 @@ public:
         return Complex(real,imag) ;
     }
     
-    Complex& operator= (const Complex & obj){
+    __host__ __device__ Complex& operator= (const Complex & obj){
         this->real = obj.realpart() ;
         this->imag = obj.imagpart() ;
         
@@ -108,7 +108,7 @@ __global__ void juliaImage(unsigned int * color_bit_device, long long N, const l
     const int numIter = 200 ;
     const Complex c(0,-0.8) ;
     Complex z(x,y) ;
-    const int threshold = 10 ;
+    const double threshold = 10.0 ;
     
     for(size_t i =0 ; i < numIter; ++i){
         z = z.square();
@@ -143,19 +143,19 @@ int main() {
     double end = getSeconds() ;
     
     // Copying data back to Host
-    checkError(cudaMemcpy(color_bit[0],&color_bit_device,cudaMemcpyDeviceToHost)) ;
+    checkError(cudaMemcpy(&color_bit[0],color_bit_device,bytes_,cudaMemcpyDeviceToHost)) ;
     
     // Freeing the memory on the device
     checkError(cudaFree(color_bit_device)) ;
 
     
     //Appyling the color bit mapping
-    for (auto i =0; i <color_bit.size(); ++i) {
+    for (int i =0; i <color_bit.size(); ++i) {
         if (color_bit[i]< 10) {
-            color_bit[i] = // black l
+            color_bit[i] = 0;// black l
         }
         else
-            color_bit[i] = // red
+            color_bit[i] = 255;// red
     }
     
     
