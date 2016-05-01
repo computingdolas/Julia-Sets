@@ -89,8 +89,8 @@ void encodeImage(const char* filename, std::vector<unsigned char>& image, unsign
 
 int main() {
 	const long long XGridPoints = (1<<11);
-	long double mesh = 1/(XGridPoints-1);
-	Complex c(0,-0.8);
+	long double mesh = 4.0/(XGridPoints);
+	Complex c(-0.4,0.6);
 	const long long numberOfGridPoints = XGridPoints * XGridPoints;
     std::vector <unsigned char> colourBit(numberOfGridPoints*4);
 
@@ -102,26 +102,32 @@ int main() {
 	   double y = mesh*(i/XGridPoints) - 2.0;
 	   Complex a(x,y);
 	   int j=0;
-	   while (j <=200)
+	   while (j <=30)
 	   {
 	    a = a.square();
 	    a = a + c;
 	    ++j;
 	   }
+      // std::cout<<a.realpart()<<std::endl;
        moduli.push_back(a.modulus());
 	  // iteration.push_back(j);
 	}
 
+    unsigned int count1 = 0;
+    unsigned int count2 = 0;
     //Color mapping by modulus
    for(int j=0;j<XGridPoints;j++){
         for(int i=0;i<XGridPoints;i++){
-            if(i<XGridPoints/2){
+            //std::cout<<moduli[j*XGridPoints+i]<<std::endl;
+            if(moduli[j*XGridPoints+i] > 20.0){
+                count1++;
                 colourBit[4*XGridPoints*j+4*i+0] = 255;
                 colourBit[4*XGridPoints*j+4*i+1] = 255;
                 colourBit[4*XGridPoints*j+4*i+2] = 0;
                 colourBit[4*XGridPoints*j+4*i+3] = 0;
             }
             else{
+                count2++;
                 colourBit[4*XGridPoints*j+4*i+0] = 0;
                 colourBit[4*XGridPoints*j+4*i+1] = 0;
                 colourBit[4*XGridPoints*j+4*i+2] = 255;
@@ -130,6 +136,7 @@ int main() {
         }
     }
 
+    std::cout<<count1<<" "<<count2<<std::endl;
     encodeImage("sunil_img.png", colourBit, XGridPoints, XGridPoints);
 
     return 0 ;
