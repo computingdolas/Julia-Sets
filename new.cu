@@ -12,6 +12,7 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
+#include <string>
 #include "lodepng.h"
 
 //#define GRID_SIZE = 1<<11 ; 
@@ -31,84 +32,13 @@ double getSeconds()
     return ((double)tp.tv_sec + (double)tp.tv_usec * 1e-6) ;
 }
 
-class Complex {
-    
-    private :
-    
-    double real ;
-    double imag ;
-    
-public:
-    
-    __host__ __device__ Complex(const double _real, const double _imag): real(_real), imag(_imag){}
-    __host__ __device__ Complex(){
-        this->real = 0.0 ;
-        this->imag = 0.0 ;
-    }
-    __host__ __device__ ~Complex(){} ;
-    
-    // Access for the real part
-    
-    __host__ __device__ const double& realpart() const {
-        return this->real ;
-    }
-    
-    __host__ __device__ double & realpart() {
-        return this->real ;
-    }
-    
-    // Access for the imag part
-    
-    __host__ __device__ const double & imagpart() const {
-        return this->imag ;
-    }
-    
-    __host__ __device__ double & imagpart() {
-        return this->imag ;
-    }
-    
-    __host__ __device__ const Complex square() {
-        Complex temp ;
-        
-        temp.realpart() = (this->realpart() * this->realpart()) - (this->imagpart() * this->imagpart()) ;
-        temp.imagpart() = (2 * this->realpart() * this->imagpart() ) ;
-        
-        this->realpart() = temp.realpart() ;
-        this->imagpart() = temp.imagpart() ;
-        
-        return *(this) ;
-        
-    }
-    
-    __host__ __device__ const double  modulus() const{
-        return std::sqrt((this->real * this->real) + (this->imag * this->imag)) ;
-    }
-    
-    __host__ __device__ Complex operator+ (const Complex & obj){
-        Complex temp ;
-        
-        double real = this->real + obj.realpart() ;
-        double imag = this->imag + obj.imagpart() ;
-        
-        return Complex(real,imag) ;
-    }
-    
-    __host__ __device__ Complex& operator= (const Complex & obj){
-        this->real = obj.realpart() ;
-        this->imag = obj.imagpart() ;
-        
-        return *(this) ;
-    }
-};
-
 // Device Function //
 
-__global__ void juliaImage(unsigned int * color_bit_device, long long N, const double mesh, const double threshold) {
+__global__ void juliaImage(unsigned char * color_bit_device, long long N, const double mesh, const double threshold) {
     
     long long idx = blockIdx.x * blockDim.x + threadIdx.x ;
     double real = (mesh * (idx % N)) - 2.0;
     double imag = (mesh * (idx / N)) - 2.0 ;
-    const int numIter = 25 ;
     double temp_real = 0.0 ; 
     double temp_imag = 0.0 ; 
     const double c_real = -0.4 ; 
@@ -124,7 +54,7 @@ __global__ void juliaImage(unsigned int * color_bit_device, long long N, const d
       real = temp_real ; 
       imag = temp_imag ; 
       
-      real += c_real ; 
+      real += c_real ;
       imag += c_imag ; 
       
       temp_real = 0.0 ; 
@@ -134,7 +64,15 @@ __global__ void juliaImage(unsigned int * color_bit_device, long long N, const d
       
       ++itr ;  
     }
-    color_bit_device[idx] = itr ; 
+    unsigned int numIter_ = itr*10 +10000;
+    unsigned i = idx % N ;
+    unsigned j = idx / N ;
+
+    color_bit_device[4*N*j+4*i+3] = (numIter_  & 255);
+    color_bit_device[4*N*j+4*i+2] = (numIter_ >> 8) & 255;
+    color_bit_device[4*N*j+4*i+1] = (numIter_ >> 16) & 255;
+    color_bit_device[4*N*j+4*i+0] = (numIter_ >> 24) & 255;
+
 }
 
 //Encode from raw pixels to disk with a single function call
@@ -143,17 +81,18 @@ void encodeImage(const char* filename, std::vector<unsigned char>& image, unsign
 {
   //Encode the image
   unsigned error = lodepng::encode(filename, image, width, height);
-
   //if there's an error, display it
   if(error) std::cout << "encoder error " << error << ": "<< lodepng_error_text(error) << std::endl;
 }
 
+int main(int argc , char *argv[]) {
 
-int main() {
-    
-    
+
+    unsigned int numTHreadsPerBlocks_ = 1024;         //std::stol(argv[1]);
+    unsigned numblocks_ =  2048 *2048 / numTHreadsPerBlocks_ ;
+
     const long long numberOfGridPoints_ = (1<<11)* (1<<11 ) ;
-    const long long bytes_ = numberOfGridPoints_ * sizeof(unsigned int ) ;
+    const long long bytes_ = numberOfGridPoints_ * sizeof(unsigned char ) * 4 ;
     const long num = 2048 ;  
     const double mesh = 4.0 / ((1<<11 )) ;
     const double threshold = 500.0 ; 
@@ -162,64 +101,25 @@ int main() {
     std::cout<<"The Total Memory in MB allocated for the program is :="<<bytes_ * 1e-6<<std::endl ;
     
     // Allocating Vector on Host
-    std::vector<unsigned int> color_bit(numberOfGridPoints_,0) ;
     std::vector <unsigned char> colourBit(numberOfGridPoints_*4);
 
-    
     // Pointer on device
-    unsigned int * color_bit_device  ;
+    unsigned char * color_bit_device  ;
     
     // Allocating memory on device
     checkError(cudaMalloc(&color_bit_device,bytes_)) ;
-    
-    // Copying Data from host to device
-    checkError(cudaMemcpy(color_bit_device,&color_bit[0],bytes_,cudaMemcpyHostToDevice)) ;
      
     double start = getSeconds() ;
-    juliaImage<<<(1<<14),(1<<8)>>>(color_bit_device,num,mesh,threshold) ;
+    juliaImage<<< numblocks_ ,numTHreadsPerBlocks_>>>(color_bit_device,num,mesh,threshold) ;
     checkError(cudaDeviceSynchronize());
     double end = getSeconds() ;
     std::cout<< (end - start) *1e3 <<std::endl ;
     
     // Copying data back to Host
-    checkError(cudaMemcpy(&color_bit[0],color_bit_device,bytes_,cudaMemcpyDeviceToHost));
-    
-    /*
-    for(unsigned int i =0 ; i < numberOfGridPoints_ ; ++i ){
-	
-      // checking if the value is edited or not 
-      std::cout<<color_bit[i]<<std::endl ;
-      
-    }
-    */
+    checkError(cudaMemcpy(&colourBit[0],color_bit_device,bytes_,cudaMemcpyDeviceToHost));
+
     // Freeing the memory on the device
     checkError(cudaFree(color_bit_device)) ;
-
-    unsigned int num_iter = 0;
-    //Generation of Image
-      for(int j=0;j<num;j++){
-        for(int i=0;i<num;i++){
-	  num_iter = color_bit[j*num+i]*10+100000;
-           /* if(color_bit[j*num+i] > 10.0){
-       
-                colourBit[4*num*j+4*i+0] = 255;
-                colourBit[4*num*j+4*i+1] = 0;
-                colourBit[4*num*j+4*i+2] = 0;
-                colourBit[4*num*j+4*i+3] = 0;
-            }
-            else{
-      
-                colourBit[4*num*j+4*i+0] = 0;
-                colourBit[4*num*j+4*i+1] = 0;
-                colourBit[4*num*j+4*i+2] = 0;
-                colourBit[4*num*j+4*i+3] = 255;
-            }*/
-		colourBit[4*num*j+4*i+3] = (num_iter  & 255);
-                colourBit[4*num*j+4*i+2] = (num_iter >> 8) & 255;
-                colourBit[4*num*j+4*i+1] = (num_iter >> 16) & 255;
-                colourBit[4*num*j+4*i+0] = (num_iter >> 24) & 255;
-        }
-    }
       
     encodeImage("Julia.png", colourBit, num, num);    
     return 0 ;
